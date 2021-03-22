@@ -462,7 +462,12 @@ if __name__ == "__main__":
 										"distribution_thresholds",
 										"probability_parameter_samples"])
 		fname = "../results/sequential_monte_carlo/LT/N_" + str(N) + ".csv" 
-		resdf.to_csv(fname, index = False)
+		if ng == 0:
+			resdf.to_csv(fname, index = False)
+		else:
+			prevdf = pd.read_csv(fname)
+			df_all = pd.concat([prevdf, resdf], ignore_index=True)
+			df_all.to_csv(fname, index = False)
 
 		dirname = "N_" + str(N)
 		dirpath = "../results/sequential_monte_carlo/LT/result_objects/" + dirname

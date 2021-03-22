@@ -505,6 +505,13 @@ if __name__ == "__main__":
 										"probability_parameter_samples"])
 		fname = "../results/sequential_monte_carlo/LT_IC/N_" + str(N) + ".csv" 
 		resdf.to_csv(fname, index = False)
+		if ng == 0:
+			resdf.to_csv(fname, index = False)
+		else:
+			prevdf = pd.read_csv(fname)
+			df_all = pd.concat([prevdf, resdf], ignore_index=True)
+			df_all.to_csv(fname, index = False)
+
 
 		dirname = "N_" + str(N)
 		dirpath = "../results/sequential_monte_carlo/LT_IC/result_objects/" + dirname
