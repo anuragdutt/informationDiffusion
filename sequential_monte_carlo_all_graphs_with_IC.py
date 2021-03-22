@@ -484,7 +484,7 @@ if __name__ == "__main__":
 		print("******************************************************************")
 
 
-		print("final activations check: ", final_activation)
+		# print("final activations check: ", final_activation)
 		reslist.append([ng+1, 
 						result.samples['prop_prob'].mean(), 
 						np.median(result.samples['prop_prob']),
