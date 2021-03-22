@@ -13,14 +13,12 @@ import scipy
 from scipy.spatial import distance
 import pandas as pd
 import sys
-import pickle
+import warnings
 import statistics
-import importlib
+warnings.filterwarnings('ignore')
 print(sys.version)
 
 global final_activation
-global generated_graph
-global all_i
 
 def genNet(n, k=4, pRewire=.1, type='grid'):
 	# create net
@@ -84,6 +82,7 @@ def genNet(n, k=4, pRewire=.1, type='grid'):
 		return net, nx.to_numpy_matrix(net, dtype=np.float)
 
 
+
 def testThresh(agents, agents_ini, mn, mx):
 	
 	if np.mean(agents) == 0:
@@ -145,7 +144,6 @@ def ltProp(agents, adjMatrix, nAgents, avgDegree=0, haltMin=.49, haltMax=.51, rs
 		step = step + 1
 
 #     print("state activation: ", prevMean)
-	generated_graph.append(agents)
 	final_activation.append(prevMean)
 	#print('LT-proportional stopped at step ' + str(step) + ' '+ str(np.mean(agents)))
 	return agents
@@ -189,61 +187,6 @@ def ltAbs(agents, adjMatrix, nAgents, avgDegree=0, haltMin=.49, haltMax=.51, rs 
 
 	# print('LT-absolute stopped at step ' + str(step) + ' '+ str(np.mean(agents)))
 	final_activation.append(prevMean)
-	generated_graph.append(agents)
-	return agents
-
-
-def IC(agents, adjMatrix, nAgents, avgDegree=0, haltMin=.49, haltMax=.51, rs = None):
-	# init some stuff for numba
-	thresholds = np.zeros_like(nAgents)
-	inp = np.zeros_like(nAgents)
-	step = 0
-	numNeighbors = np.zeros_like(nAgents)
-	prevMean = -1
-	liveEdges = np.zeros_like(adjMatrix)
-	pInfect = np.zeros_like(adjMatrix)
-	flips = np.zeros_like(adjMatrix)
-
-		
-	numNeighbors = np.sum(adjMatrix, axis=0)
-	#prevMean = -1
-	step = 1
-	
-	# calculate each edges probability of allowing infection
-	
-	# determine 'live' and 'blocked' edges
-	
-	if rs is None:
-		pInfect = np.multiply(adjMatrix, np.random.random(adjMatrix.shape))
-		flips = np.random.random(pInfect.shape)
-	else:
-		pInfect = np.multiply(adjMatrix, rs.random(adjMatrix.shape))
-		flips = rs.random(pInfect.shape)
-		
-	pInfect = np.multiply(cascadeParameter, pInfect)
-	liveEdges = flips < pInfect
-	
-	agents_ini = agents
-		
-	loop_manager = False
-
-	count = 40
-	while not loop_manager and (np.mean(agents) > prevMean):
-		agents, loop_manager = testThresh(agents, agents_ini, haltMin, haltMax)
-
-		prevMean = np.mean(agents)
-		inp = np.dot(agents, liveEdges)
-		agents = np.logical_or(agents, inp).astype(int)
-		step = step + 1
-		
-		if count >= 40:
-			loop_manager = True
-		count += 1
-		
-	final_activation.append(prevMean)
-	# print('LT-absolute stopped at step ' + str(step) + ' '+ str(np.mean(agents)))
-	generated_graph.append(agents)
-	
 	return agents
 
 
@@ -286,15 +229,7 @@ def generateGraph(net, adjMatrix, pp, batch_size = 1, random_state=None):
 
 		avgDegree = 2*net.number_of_edges() / float(net.number_of_nodes())
 #         print("initially activated agents: ", agents[agents == 1].shape)
-		t = 1/3
-	
-		if pp <= t:
-			agents_type = IC(agents, adjMatrix, nAgents, avgDegree=avgDegree, 
-								 haltMin = max(0,p_activation-activation_ci), 
-								 haltMax = min(p_activation+activation_ci,1), 
-								 rs = random_state)
-
-		elif pp > t and pp <= 2*t:
+		if pp >= 0.5:
 			agents_type = ltProp(agents, adjMatrix, nAgents, avgDegree=avgDegree, 
 								 haltMin = max(0,p_activation-activation_ci), 
 								 haltMax = min(p_activation+activation_ci,1), 
@@ -305,7 +240,6 @@ def generateGraph(net, adjMatrix, pp, batch_size = 1, random_state=None):
 								haltMin = max(0,p_activation-activation_ci), 
 								haltMax = min(p_activation+activation_ci,1), 
 								rs = random_state)
-
 
 		#if not testThresh(agents_type, haltMin, haltMax):
 		 #   print('bad data, LTabs1:\t'+str(np.mean(agents_type)))
@@ -322,19 +256,14 @@ def generateGraph(net, adjMatrix, pp, batch_size = 1, random_state=None):
 	return gg[0]
 
 
+
 def compileG(ll, batch_size = 1, random_state=None):
 	return generateGraph(net_s, adjMat_s, ll[0], batch_size, random_state)
 
 
 def yMetric(x, i = 0):
-	try:
-		ttmp = x[0,i]
-		all_i.append(i)
-	except:
-		print(i)
-		print(all_i)
-		sys.exit()
 	return x[0,i]
+
 
 def eucMultiArgs(X, Y):
 	dist = np.linalg.norm(X - Y) 
@@ -342,23 +271,18 @@ def eucMultiArgs(X, Y):
 
 
 if __name__ == "__main__":
+
 	#for i in range(len(sglist)):
-#    print('# of nodes in {i}th component is  - ', str(np.mean(gmat[i])))
+	#    print('# of nodes in {i}th component is  - ', str(np.mean(gmat[i])))
 	seeds = pd.read_csv("../data/icpsr/DS0001/paluck-seed.csv")
 	seeds['ID'] = ((seeds['SCHIDW2'] * 1000) + pd.to_numeric(seeds['ID'], errors='coerce'))
 	es = pd.read_csv("../data/icpsr/DS0001/paluck-endstate.csv")
 	es['ID'] = ((es['SCHIDW2'] * 1000) + pd.to_numeric(es['ID'], errors='coerce'))
 
-	ng = int(sys.argv[1])
-	N = int(sys.argv[2]) # samples for rejection sampling or sequential monte carlo
-
-	# ng = 4
 	# seed = 20170530  # this will be separately given by ELFI
 	# np.random.seed(seed)
-	# schedule = [70, 50]
-	schedule_per = [90, 60, 30, 10]
-	# schedule_per = [70, 50] # percentile of rejection sampling to be used as schedule thresholds
-	
+	ng = int(sys.argv[1])
+	N = int(sys.argv[2]) # samples for rejection sampling
 	networktype = 'pref' #pref, smallworld, grid, ER, korea1, korea2, ckm
 
 	print(nx.__version__)
@@ -367,7 +291,6 @@ if __name__ == "__main__":
 	globalThreshold = 1.5
 	activation_ci = 0.075
 	cascadeParameter = 0.5
-
 	edgelist = pd.read_csv(path)
 	G = nx.from_pandas_edgelist(edgelist, source='ID', target='PEERID')
 	print(nx.info(G))
@@ -393,10 +316,8 @@ if __name__ == "__main__":
 
 	# for ng in range(nx.number_connected_components(G)):
 
-	# for ng in ordered_graph_list:
-		#n,a = getGraphFromEdgelist(path)
-
-	print("Importance Sampling for graph: ", ng+1)
+	#n,a = getGraphFromEdgelist(path)
+	print("Rejection Sampling for graph: ", ng+1)
 	net_s = sglist[ng]
 	adjMat_s = gmat[ng]
 	nAgobs = nx.number_of_nodes(net_s)
@@ -410,8 +331,6 @@ if __name__ == "__main__":
 	seed_node_count = 0
 
 	final_activation = []
-	generated_graph = []
-	all_i = []
 
 	for s in nodeobs:
 		if s in seeds['ID'].tolist():
@@ -427,23 +346,19 @@ if __name__ == "__main__":
 				num_esobs += 1
 			count_esobs += 1
 
-		print("number of total nodes: ", count_esobs)
-
 		agobs[:,es_inxobs] = 1
 
 		gr_obs = np.matrix(agobs).astype(int)
-		dcom = "d = elfi.Distance('euclidean'"
-
+		dcom = "d=elfi.Distance('euclidean'"
 
 		prop_prob = elfi.Prior('uniform', 0, 1)
 		Y = elfi.Simulator(compileG, prop_prob, observed = gr_obs)
 		ret = []
-
 		for i in range(gr_obs.shape[1]):
 			st = str(i)
 			var_s = ''.join(['s',st])
 			ret.append(var_s)
-			com = var_s + ' = ' + 'elfi.Summary(yMetric, Y, ' + st + ')'
+			com = var_s + ' = ' + 'elfi.Summary(yMetric, Y, '+st+')'
 			exec(com)
 			if i == 0:
 				dcom = dcom + ',s' + str(i)
@@ -452,46 +367,20 @@ if __name__ == "__main__":
 		dcom = dcom + ')'
 
 		exec(dcom)
-
-
 		# d = elfi.Distance('euclidean',s7)
 		# d = elfi.Distance('euclidean',s0, s1, s2, s3, s4, s5, s6)
 
-		# running rejection sampling
+	#         rej = elfi.Rejection(d, batch_size=1, seed=seed)
 		rej = elfi.Rejection(d, batch_size=1)
-		rej_result = rej.sample(N, quantile=0.1)
-
-		distl = []
-		for ggr in generated_graph:
-			distl.append(eucMultiArgs(ggr, gr_obs)[0])
-
-		print("Schedule thresholds: ", np.percentile(np.array(distl), schedule_per))
-		print("***********************************")
-		print("***********************************")
-
-		final_activation = []
-		generated_graph = []
-		schedule = list(np.percentile(np.array(distl), schedule_per))
-
-	#         print("observation matrix shape after transformation: ", gr_obs.shape[1])
-
-		smc = elfi.SMC(d, batch_size=1)
-
-		result = smc.sample(N, schedule)
-		print(result.summary(all = True))
-
-		print(count_esobs, min(all_i), max(all_i))
-		print("******************************************************************")
-
-
-		# print("final activations check: ", final_activation)
+		result = rej.sample(N, quantile=0.1)
+		print(result)
+	#         print("final activations check: ", final_activation)
 		reslist.append([ng+1, 
 						result.samples['prop_prob'].mean(), 
 						np.median(result.samples['prop_prob']),
 						statistics.stdev(result.samples['prop_prob']),
 						seed_node_count/count_esobs, 
 						num_esobs/count_esobs, np.max(final_activation), 
-						schedule,
 						result.samples['prop_prob']])
 		resdf = pd.DataFrame(reslist, 
 							 columns = ["graph_index", 
@@ -501,9 +390,8 @@ if __name__ == "__main__":
 										"seed_activation",
 										"actual_end_activation", 
 										"observed_max_end_activation_10_samples",
-										"distribution_thresholds",
 										"probability_parameter_samples"])
-		fname = "../results/sequential_monte_carlo/LT_IC/N_" + str(N) + ".csv" 
+		fname = "../results/rejection_sampling/LT/N_" + str(N) + ".csv" 
 		if ng == 0:
 			resdf.to_csv(fname, index = False)
 		else:
@@ -513,13 +401,11 @@ if __name__ == "__main__":
 
 
 		dirname = "N_" + str(N)
-		dirpath = "../results/sequential_monte_carlo/LT_IC/result_objects/" + dirname
+		dirpath = "../results/rejection_sampling/LT/result_objects/" + dirname
 		if not os.path.exists(dirpath):
 			os.makedirs(dirpath)
+		
 		filename = os.path.join(dirpath, "graph_" + str(ng+1) +".pkl")
 		filehandler = open(filename, 'wb')
 		pickle.dump(result, filehandler)
 		filehandler.close()
-
-	else:
-		print("Number of seed nodes is zero. Hence not running")
