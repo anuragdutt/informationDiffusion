@@ -22,6 +22,16 @@ global final_activation
 global generated_graph
 global all_i
 
+global ic_count
+global ltp_count
+global lta_count
+
+global ic_ltp
+global ic_lta
+global ltp_lta
+
+global count_samples
+
 def genNet(n, k=4, pRewire=.1, type='grid'):
 	# create net
 	if type == 'grid': #wrap the grid
@@ -287,7 +297,8 @@ def generateGraph(net, adjMatrix, pp, batch_size = 1, random_state=None):
 		avgDegree = 2*net.number_of_edges() / float(net.number_of_nodes())
 #         print("initially activated agents: ", agents[agents == 1].shape)
 		t = 1/3
-	
+		
+		count_sample += 1
 		if pp <= t:
 			agents_type = IC(agents, adjMatrix, nAgents, avgDegree=avgDegree, 
 								 haltMin = max(0,p_activation-activation_ci), 
@@ -482,6 +493,17 @@ if __name__ == "__main__":
 
 		print(count_esobs, min(all_i), max(all_i))
 		print("******************************************************************")
+		
+
+		count_samp = pd.to_numeric(pd.Series(list(result.samples['prop_prob'])))
+		count_samples = len(count_samp)
+		ic_count = len(count_samp[count_samp <= 0.3333])
+		ltp_count = len(count_samp[(count_samp > 0.3333) & (count_samp <= 0.6667)])
+		lta_count = len(count_samp[count_samp > 0.6667])
+		
+		ic_ltp = len(count_samp[count_samp < 0.6667])
+		ic_lta = len(count_samp[(count_samp < 0.3333) | (count_samp > 0.6667)])
+		ltp_lta = len(count_samp[count_samp > 0.3333])
 
 
 		# print("final activations check: ", final_activation)
@@ -489,6 +511,12 @@ if __name__ == "__main__":
 						result.samples['prop_prob'].mean(), 
 						np.median(result.samples['prop_prob']),
 						statistics.stdev(result.samples['prop_prob']),
+						ic_count/count_samples,
+						ltp_count/count_samples,
+						lta_count/count_samples,
+						ic_ltp/count_samples,
+						ic_lta/count_samples,
+						ltp_lta/count_samples,
 						seed_node_count/count_esobs, 
 						num_esobs/count_esobs, np.max(final_activation), 
 						schedule,
@@ -498,6 +526,12 @@ if __name__ == "__main__":
 										"probability_parameter_mean", 
 										"probability_parameter_median",
 										"probability_parameter_stdev",
+										"ic_probability_inference",
+										"ltp_probability_inference",
+										"lta_probability_inference",
+										"ic_or_ltp_probability_inference",
+										"ic_or_lta_probability_inference",
+										"ltp_or_lta_probability_inference",
 										"seed_activation",
 										"actual_end_activation", 
 										"observed_max_end_activation_10_samples",

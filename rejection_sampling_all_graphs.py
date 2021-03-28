@@ -20,6 +20,16 @@ print(sys.version)
 
 global final_activation
 
+global ic_count
+global ltp_count
+global lta_count
+
+global ic_ltp
+global ic_lta
+global ltp_lta
+
+global count_samples
+
 def genNet(n, k=4, pRewire=.1, type='grid'):
 	# create net
 	if type == 'grid': #wrap the grid
@@ -229,17 +239,27 @@ def generateGraph(net, adjMatrix, pp, batch_size = 1, random_state=None):
 
 		avgDegree = 2*net.number_of_edges() / float(net.number_of_nodes())
 #         print("initially activated agents: ", agents[agents == 1].shape)
-		if pp >= 0.5:
+		t = 1/2
+	
+#         if pp <= t:
+#             agents_type = IC(agents, adjMatrix, nAgents, avgDegree=avgDegree, 
+#                                  haltMin = max(0,p_activation-activation_ci), 
+#                                  haltMax = min(p_activation+activation_ci,1), 
+#                                  rs = random_state)
+
+		if pp <= t:
 			agents_type = ltProp(agents, adjMatrix, nAgents, avgDegree=avgDegree, 
 								 haltMin = max(0,p_activation-activation_ci), 
 								 haltMax = min(p_activation+activation_ci,1), 
 								 rs = random_state)
+
 
 		else:
 			agents_type = ltAbs(agents, adjMatrix, nAgents, avgDegree=avgDegree, 
 								haltMin = max(0,p_activation-activation_ci), 
 								haltMax = min(p_activation+activation_ci,1), 
 								rs = random_state)
+
 
 		#if not testThresh(agents_type, haltMin, haltMax):
 		 #   print('bad data, LTabs1:\t'+str(np.mean(agents_type)))
@@ -284,6 +304,16 @@ if __name__ == "__main__":
 	ng = int(sys.argv[1])
 	N = int(sys.argv[2]) # samples for rejection sampling
 	networktype = 'pref' #pref, smallworld, grid, ER, korea1, korea2, ckm
+
+	ic_count = 0
+	ltp_count = 0
+	lta_count = 0
+
+	ic_ltp = 0
+	ic_lta = 0
+	ltp_lta = 0
+
+	count_samples = 0
 
 	print(nx.__version__)
 	#parameters of the script
@@ -375,10 +405,23 @@ if __name__ == "__main__":
 		result = rej.sample(N, quantile=0.1)
 		print(result)
 	#         print("final activations check: ", final_activation)
+
+
+		count_samp = pd.to_numeric(pd.Series(list(result.samples['prop_prob'])))
+		count_samples = len(count_samp)
+		ltp_count = len(count_samp[count_samp >= 0.5])
+		lta_count = len(count_samp[count_samp < 0.5])
+		ltp_lta = len(count_samp[(count_samp < 0.5 ) | (count_samp >= 0.5)])
+
+
+
 		reslist.append([ng+1, 
 						result.samples['prop_prob'].mean(), 
 						np.median(result.samples['prop_prob']),
 						statistics.stdev(result.samples['prop_prob']),
+						ltp_count/count_samples,
+						lta_count/count_samples,
+						ltp_lta/count_samples,
 						seed_node_count/count_esobs, 
 						num_esobs/count_esobs, np.max(final_activation), 
 						result.samples['prop_prob']])
@@ -387,11 +430,15 @@ if __name__ == "__main__":
 										"probability_parameter_mean", 
 										"probability_parameter_median",
 										"probability_parameter_stdev",
+										"ltp_probability_inference",
+										"lta_probability_inference",
+										"ltp_or_lta_probability_inference",
 										"seed_activation",
 										"actual_end_activation", 
 										"observed_max_end_activation_10_samples",
 										"probability_parameter_samples"])
 		fname = "../results/rejection_sampling/LT/N_" + str(N) + ".csv" 
+
 		if ng == 0:
 			resdf.to_csv(fname, index = False)
 		else:
