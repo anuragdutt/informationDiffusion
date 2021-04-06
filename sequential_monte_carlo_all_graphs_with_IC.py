@@ -372,6 +372,16 @@ if __name__ == "__main__":
 	
 	networktype = 'pref' #pref, smallworld, grid, ER, korea1, korea2, ckm
 
+	ic_count = 0
+	ltp_count = 0
+	lta_count = 0
+
+	ic_ltp = 0
+	ic_lta = 0
+	ltp_lta = 0
+
+	count_samples = 0
+
 	print(nx.__version__)
 	#parameters of the script
 	path = '../data/icpsr/DS0001/paluck-edgelist.csv'
