@@ -298,7 +298,6 @@ def generateGraph(net, adjMatrix, pp, batch_size = 1, random_state=None):
 #         print("initially activated agents: ", agents[agents == 1].shape)
 		t = 1/3
 		
-		count_samples += 1
 		if pp <= t:
 			agents_type = IC(agents, adjMatrix, nAgents, avgDegree=avgDegree, 
 								 haltMin = max(0,p_activation-activation_ci), 
